@@ -40,6 +40,12 @@
   const copyCodeBtn = document.getElementById("copyCode");
   const onlinePlayersEl = document.getElementById("onlinePlayers");
   const onlineMsgEl = document.getElementById("onlineMsg");
+  const lobbyMsgEl = document.getElementById("lobbyMsg");
+  // Write to both the lobby and the live panel, since either may be the visible one.
+  function setOnlineMsg(text) {
+    onlineMsgEl.textContent = text;
+    lobbyMsgEl.textContent = text;
+  }
   const resignBtn = document.getElementById("resignBtn");
   const leaveOnlineBtn = document.getElementById("leaveOnline");
 
@@ -514,21 +520,33 @@
     },
     onFull() {
       onlineActive = false;
-      onlineMsgEl.textContent = "That room is full.";
+      setOnlineMsg("That room already has two players.");
       onlineLive.hidden = true;
       onlineLobby.hidden = false;
+      render();
     },
     onError(message) {
-      onlineMsgEl.textContent = message || "Connection error";
+      const friendly =
+        message === "Connection error"
+          ? "Can't reach the game server. Is the backend running?"
+          : message === "Room not found"
+            ? "No game with that code. Check the code and try again."
+            : message || "Something went wrong.";
+      setOnlineMsg(friendly);
       if (!onlineStarted) {
         onlineLive.hidden = true;
         onlineLobby.hidden = false;
         onlineActive = false;
+        render();
       }
     },
     onClose() {
       if (onlineActive && !onlineEnded && !onlineStarted) {
-        onlineMsgEl.textContent = "Disconnected. Try again.";
+        setOnlineMsg("Disconnected. Try again.");
+        onlineLive.hidden = true;
+        onlineLobby.hidden = false;
+        onlineActive = false;
+        render();
       }
     },
   };
@@ -557,6 +575,7 @@
     onlineEndMsg = "";
     opponentName = "";
     resignBtn.hidden = true;
+    lobbyMsgEl.textContent = "";
     onlineMsgEl.textContent = room ? "Joining…" : "Creating game…";
     const name = (onlineNameInput.value || "Player").trim().slice(0, 24) || "Player";
     Online.connect({ room: room || null, name, handlers: onlineHandlers });
@@ -620,7 +639,7 @@
   createGameBtn.addEventListener("click", () => startOnline(null));
   joinGameBtn.addEventListener("click", () => {
     const code = (joinCodeInput.value || "").trim().toUpperCase();
-    if (!code) { onlineMsgEl.textContent = "Enter a room code to join."; return; }
+    if (code.length !== 5) { setOnlineMsg("Enter the 5-character room code."); return; }
     onlineLobby.hidden = true;
     onlineLive.hidden = false;
     startOnline(code);

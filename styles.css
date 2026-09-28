@@ -545,6 +545,13 @@ body {
   text-align: center;
   min-height: 1.2em;
 }
+.online-error {
+  color: #a8321f;
+  font-weight: 600;
+}
+.online-error:empty {
+  display: none;
+}
 .online-resign {
   color: #8f1f12;
   border-color: #a8321f;
