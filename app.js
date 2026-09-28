@@ -1,4 +1,4 @@
-// app.js — UI and game flow. Depends on global `Engine` and `AI`.
+// app.js — UI and game flow. Depends on globals Engine, AI, Stockfish, Sound, Online.
 
 (function () {
   "use strict";
@@ -28,17 +28,40 @@
   const sideField = document.getElementById("sideField");
   const difficultyField = document.getElementById("difficultyField");
 
+  // ---- Online (multiplayer) DOM ----
+  const onlinePanel = document.getElementById("onlinePanel");
+  const onlineLobby = document.getElementById("onlineLobby");
+  const onlineLive = document.getElementById("onlineLive");
+  const onlineNameInput = document.getElementById("onlineName");
+  const createGameBtn = document.getElementById("createGame");
+  const joinCodeInput = document.getElementById("joinCode");
+  const joinGameBtn = document.getElementById("joinGame");
+  const roomCodeEl = document.getElementById("roomCode");
+  const copyCodeBtn = document.getElementById("copyCode");
+  const onlinePlayersEl = document.getElementById("onlinePlayers");
+  const onlineMsgEl = document.getElementById("onlineMsg");
+  const resignBtn = document.getElementById("resignBtn");
+  const leaveOnlineBtn = document.getElementById("leaveOnline");
+
   // ---- Game state ----
   let state = E.startPosition();
   let history = []; // { state (before), move, san }
   let selected = null; // [r,c]
   let legalForSelected = [];
   let flipped = false;
-  let mode = "ai"; // "ai" | "human"
+  let mode = "ai"; // "ai" | "human" | "online"
   let humanColor = "w";
   let aiThinking = false;
   let lastMove = null; // { from, to }
   let useStockfish = false; // becomes true once Stockfish reports ready
+
+  // ---- Online state ----
+  let onlineActive = false; // a create/join session is in progress
+  let onlineStarted = false; // both players present, game in progress
+  let onlineEnded = false; // resign / opponent left ended the game
+  let onlineColor = "w"; // this client's color in an online game
+  let onlineEndMsg = ""; // overrides status when the online game ends
+  let opponentName = ""; // opponent display name, when known
 
   const engineCard = document.getElementById("engineCard");
   const engineNameEl = document.getElementById("engineName");
@@ -145,6 +168,22 @@
       statusEl.classList.add("thinking");
       return;
     }
+    // online: a resign / opponent-left message takes precedence
+    if (mode === "online") {
+      if (onlineEndMsg) {
+        statusEl.textContent = onlineEndMsg;
+        statusEl.classList.add("over");
+        return;
+      }
+      if (!onlineActive) {
+        statusEl.textContent = "Play online — create or join a game";
+        return;
+      }
+      if (!onlineStarted) {
+        statusEl.textContent = "Waiting for opponent…";
+        return;
+      }
+    }
     const mover = state.turn === "w" ? "White" : "Black";
     const other = state.turn === "w" ? "Black" : "White";
     if (status === "checkmate") {
@@ -156,6 +195,12 @@
     } else if (status === "draw50") {
       statusEl.textContent = "Draw (50-move rule)";
       statusEl.classList.add("over");
+    } else if (mode === "online") {
+      // frame the turn from this player's point of view
+      const yours = state.turn === onlineColor;
+      const label = yours ? "Your move" : "Opponent's move";
+      statusEl.textContent = status === "check" ? label + " — check!" : label;
+      if (status === "check") statusEl.classList.add("check");
     } else if (status === "check") {
       statusEl.textContent = mover + " to move — check!";
       statusEl.classList.add("check");
@@ -234,6 +279,10 @@
     if (aiThinking) return;
     if (isGameOver()) return;
     if (mode === "ai" && state.turn !== humanColor) return;
+    if (mode === "online") {
+      if (!onlineStarted || onlineEnded) return; // wait for opponent / game over
+      if (state.turn !== onlineColor) return; // not your turn
+    }
 
     const piece = state.board[r][c];
 
@@ -280,7 +329,14 @@
     promotionEl.hidden = false;
   }
 
-  function commitMove(move) {
+  function commitMove(move, remote) {
+    // In online play, send our own moves to the opponent before applying locally.
+    if (mode === "online" && !remote && Online.isConnected()) {
+      Online.sendMove(
+        { from: move.from, to: move.to, promotion: move.promotion || null },
+        E.toFEN(state)
+      );
+    }
     const san = E.moveToSAN(state, move);
     history.push({ state: state, move: move, san: san });
     state = E.applyMove(state, move);
@@ -294,6 +350,20 @@
     if (mode === "ai" && !isGameOver() && state.turn !== humanColor) {
       triggerAI();
     }
+  }
+
+  // Apply a move received from the online opponent. Re-resolve it against our
+  // own state so captured/en-passant/castle details stay correct.
+  function applyRemoteMove(data) {
+    const m = data && data.move;
+    if (!m) return;
+    const legal = E.legalMoves(state).find(
+      (x) =>
+        x.from[0] === m.from[0] && x.from[1] === m.from[1] &&
+        x.to[0] === m.to[0] && x.to[1] === m.to[1] &&
+        (m.promotion ? x.promotion === m.promotion : !x.promotion)
+    );
+    if (legal) commitMove(legal, true);
   }
 
   // Difficulty select stores Stockfish skill (0-20). Map to a think-time too:
@@ -346,12 +416,25 @@
   }
 
   function isGameOver() {
+    if (mode === "online" && onlineEnded) return true;
     const s = E.gameStatus(state);
     return s === "checkmate" || s === "stalemate" || s === "draw50";
   }
 
   // ---- Controls ----
   function newGame() {
+    mode = modeSel.value;
+    // Online mode isn't a local "new game" — it's driven by the lobby.
+    if (mode === "online") {
+      resetOnlineToLobby();
+      return;
+    }
+    // Leaving online mode: tear down any live connection.
+    if (window.Online && Online.isConnected()) Online.disconnect();
+    onlineActive = false;
+    onlineStarted = false;
+    onlineEnded = false;
+    onlineEndMsg = "";
     state = E.startPosition();
     history = [];
     selected = null;
@@ -359,13 +442,138 @@
     lastMove = null;
     aiThinking = false;
     promotionEl.hidden = true;
-    mode = modeSel.value;
     humanColor = sideSel.value;
     flipped = mode === "ai" && humanColor === "b";
     if (useStockfish) Stockfish.newGame();
     render();
     renderHistory();
     if (mode === "ai" && state.turn !== humanColor) triggerAI();
+  }
+
+  function resetLocalBoard() {
+    state = E.startPosition();
+    history = [];
+    selected = null;
+    legalForSelected = [];
+    lastMove = null;
+    aiThinking = false;
+    promotionEl.hidden = true;
+    render();
+    renderHistory();
+  }
+
+  // ---- Online orchestration ----
+  const onlineHandlers = {
+    onInit(msg) {
+      onlineColor = msg.color;
+      flipped = onlineColor === "b";
+      roomCodeEl.textContent = msg.room || "—";
+      onlineLobby.hidden = true;
+      onlineLive.hidden = false;
+      renderOnlinePlayers();
+      render();
+    },
+    onOpponentJoined(msg) {
+      opponentName = msg.name || "Opponent";
+      renderOnlinePlayers();
+    },
+    onStart(msg) {
+      onlineColor = msg.color;
+      if (msg.opponent) opponentName = msg.opponent;
+      flipped = onlineColor === "b";
+      onlineStarted = true;
+      onlineEnded = false;
+      onlineEndMsg = "";
+      resetLocalBoard();
+      resignBtn.hidden = false;
+      onlineMsgEl.textContent = "Game on! " + (onlineColor === "w" ? "You are White — your move." : "You are Black.");
+      renderOnlinePlayers();
+      if (window.Sound && Sound.play) Sound.play.start();
+      render();
+    },
+    onMove(msg) {
+      applyRemoteMove(msg);
+    },
+    onResign() {
+      onlineEnded = true;
+      onlineEndMsg = "Opponent resigned — you win!";
+      resignBtn.hidden = true;
+      render();
+    },
+    onOpponentLeft() {
+      if (onlineStarted && !onlineEnded) {
+        onlineEnded = true;
+        onlineEndMsg = "Opponent left — you win!";
+      } else {
+        onlineMsgEl.textContent = "Opponent left. Waiting for a new player…";
+      }
+      resignBtn.hidden = true;
+      opponentName = "";
+      renderOnlinePlayers();
+      render();
+    },
+    onFull() {
+      onlineActive = false;
+      onlineMsgEl.textContent = "That room is full.";
+      onlineLive.hidden = true;
+      onlineLobby.hidden = false;
+    },
+    onError(message) {
+      onlineMsgEl.textContent = message || "Connection error";
+      if (!onlineStarted) {
+        onlineLive.hidden = true;
+        onlineLobby.hidden = false;
+        onlineActive = false;
+      }
+    },
+    onClose() {
+      if (onlineActive && !onlineEnded && !onlineStarted) {
+        onlineMsgEl.textContent = "Disconnected. Try again.";
+      }
+    },
+  };
+
+  function renderOnlinePlayers() {
+    const you = onlineColor === "w" ? "White" : "Black";
+    const opp = onlineColor === "w" ? "Black" : "White";
+    const yourName = (onlineNameInput.value || "You").trim() || "You";
+    onlinePlayersEl.innerHTML =
+      `<div class="pl you"><span class="dot ${onlineColor === "w" ? "w" : "b"}"></span>` +
+      `${escapeHtml(yourName)} <em>(${you})</em></div>` +
+      `<div class="pl opp"><span class="dot ${onlineColor === "w" ? "b" : "w"}"></span>` +
+      `${opponentName ? escapeHtml(opponentName) : "Waiting…"} <em>(${opp})</em></div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+  }
+
+  function startOnline(room) {
+    onlineActive = true;
+    onlineStarted = false;
+    onlineEnded = false;
+    onlineEndMsg = "";
+    opponentName = "";
+    resignBtn.hidden = true;
+    onlineMsgEl.textContent = room ? "Joining…" : "Creating game…";
+    const name = (onlineNameInput.value || "Player").trim().slice(0, 24) || "Player";
+    Online.connect({ room: room || null, name, handlers: onlineHandlers });
+  }
+
+  function resetOnlineToLobby() {
+    Online.disconnect();
+    onlineActive = false;
+    onlineStarted = false;
+    onlineEnded = false;
+    onlineEndMsg = "";
+    opponentName = "";
+    flipped = false;
+    onlineLive.hidden = true;
+    onlineLobby.hidden = false;
+    resignBtn.hidden = true;
+    resetLocalBoard();
   }
 
   function undo() {
@@ -384,9 +592,15 @@
   }
 
   function updateControlVisibility() {
-    const ai = modeSel.value === "ai";
+    const m = modeSel.value;
+    const ai = m === "ai";
+    const online = m === "online";
     sideField.style.display = ai ? "" : "none";
     difficultyField.style.display = ai ? "" : "none";
+    engineCard.style.display = ai ? "" : "none";
+    onlinePanel.hidden = !online;
+    // Undo makes no sense across a network; hide it online.
+    document.getElementById("undo").style.display = online ? "none" : "";
   }
 
   document.getElementById("newGame").addEventListener("click", newGame);
@@ -401,6 +615,46 @@
   });
   sideSel.addEventListener("change", newGame);
   diffSel.addEventListener("change", updateEngineBadge); // strength label; applies on next AI move
+
+  // ---- Online buttons ----
+  createGameBtn.addEventListener("click", () => startOnline(null));
+  joinGameBtn.addEventListener("click", () => {
+    const code = (joinCodeInput.value || "").trim().toUpperCase();
+    if (!code) { onlineMsgEl.textContent = "Enter a room code to join."; return; }
+    onlineLobby.hidden = true;
+    onlineLive.hidden = false;
+    startOnline(code);
+  });
+  joinCodeInput.addEventListener("input", () => {
+    joinCodeInput.value = joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  });
+  joinCodeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") joinGameBtn.click();
+  });
+  copyCodeBtn.addEventListener("click", () => {
+    const code = roomCodeEl.textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+    copyCodeBtn.textContent = "Copied!";
+    setTimeout(() => (copyCodeBtn.textContent = "Copy"), 1200);
+  });
+  resignBtn.addEventListener("click", () => {
+    if (!onlineStarted || onlineEnded) return;
+    Online.sendResign();
+    onlineEnded = true;
+    onlineEndMsg = "You resigned.";
+    resignBtn.hidden = true;
+    render();
+  });
+  leaveOnlineBtn.addEventListener("click", () => {
+    resetOnlineToLobby();
+  });
+  try {
+    const savedName = localStorage.getItem("chessName");
+    if (savedName) onlineNameInput.value = savedName;
+  } catch (e) {}
+  onlineNameInput.addEventListener("change", () => {
+    try { localStorage.setItem("chessName", onlineNameInput.value.trim()); } catch (e) {}
+  });
 
   const soundBtn = document.getElementById("sound");
   let soundOn = true;

@@ -38,7 +38,8 @@
               <span>Mode</span>
               <select id="mode">
                 <option value="ai">You vs Computer</option>
-                <option value="human">Two Players</option>
+                <option value="human">Two Players (same device)</option>
+                <option value="online">Play Online</option>
               </select>
             </label>
 
@@ -70,6 +71,30 @@
             </div>
           </div>
 
+          <div class="online-panel" id="onlinePanel" hidden>
+            <div class="online-lobby" id="onlineLobby">
+              <input class="online-name" id="onlineName" type="text" maxlength="24" placeholder="Your name" />
+              <button class="btn btn-primary" id="createGame">Create Game</button>
+              <div class="online-or">or join with a code</div>
+              <div class="online-join">
+                <input class="online-code" id="joinCode" type="text" maxlength="5" placeholder="CODE" autocomplete="off" />
+                <button class="btn" id="joinGame">Join</button>
+              </div>
+            </div>
+
+            <div class="online-live" id="onlineLive" hidden>
+              <div class="online-room">
+                <span class="online-label">Room code</span>
+                <span class="online-roomcode" id="roomCode">&mdash;</span>
+                <button class="btn online-copy" id="copyCode" title="Copy code">Copy</button>
+              </div>
+              <div class="online-players" id="onlinePlayers"></div>
+              <div class="online-msg" id="onlineMsg">Waiting for opponent&hellip;</div>
+              <button class="btn online-resign" id="resignBtn" hidden>Resign</button>
+              <button class="btn" id="leaveOnline">Leave</button>
+            </div>
+          </div>
+
           <div class="buttons">
             <button id="newGame" class="btn btn-primary">New Game</button>
             <button id="undo" class="btn">Undo</button>
@@ -89,6 +114,7 @@
     <script src="ai.js"></script>
     <script src="sf.js"></script>
     <script src="sounds.js"></script>
+    <script src="online.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

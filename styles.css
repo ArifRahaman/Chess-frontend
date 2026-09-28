@@ -436,6 +436,120 @@ body {
   color: #7a5a2e;
 }
 
+/* ---------- Online panel ---------- */
+.online-panel {
+  margin: 0 0 16px;
+  padding: 14px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(90, 58, 34, 0.06));
+  border: 1px solid #c9ad7f;
+}
+.online-panel[hidden] {
+  display: none;
+}
+.online-lobby,
+.online-live {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.online-lobby[hidden],
+.online-live[hidden] {
+  display: none;
+}
+.online-name,
+.online-code {
+  font-family: var(--serif);
+  font-size: 16px;
+  padding: 8px 10px;
+  border: 1px solid #b89668;
+  border-radius: 4px;
+  background: #fffaf0;
+  color: var(--ink);
+  width: 100%;
+}
+.online-code {
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  font-weight: 700;
+  text-align: center;
+}
+.online-or {
+  text-align: center;
+  font-style: italic;
+  color: #7a5a2e;
+  font-size: 14px;
+}
+.online-join {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.online-room {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.online-label {
+  font-size: 13px;
+  color: #6b4a2a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.online-roomcode {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px dashed #b89668;
+  border-radius: 4px;
+  padding: 2px 12px;
+}
+.online-copy {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.online-players {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 15px;
+}
+.online-players .pl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.online-players .pl em {
+  color: #7a5a2e;
+  font-size: 13px;
+}
+.online-players .dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid #5a3a22;
+  flex: 0 0 auto;
+}
+.online-players .dot.w { background: #fffaf0; }
+.online-players .dot.b { background: #2b2b2b; }
+.online-msg {
+  font-size: 14px;
+  font-style: italic;
+  color: #5a3d22;
+  text-align: center;
+  min-height: 1.2em;
+}
+.online-resign {
+  color: #8f1f12;
+  border-color: #a8321f;
+}
+
 .buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
