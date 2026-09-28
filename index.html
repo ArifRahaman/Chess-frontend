@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <h1>Chess</h1>
+        <p class="tagline">Full rules · play a friend or the computer</p>
+      </header>
+
+      <main class="layout">
+        <section class="board-area">
+          <div class="captured captured-top" id="capturedBlack"></div>
+
+          <div class="board-wrap">
+            <div class="board" id="board"></div>
+            <div class="promotion" id="promotion" hidden>
+              <div class="promotion-box" id="promotionBox"></div>
+            </div>
+          </div>
+
+          <div class="captured captured-bottom" id="capturedWhite"></div>
+        </section>
+
+        <aside class="panel">
+          <div class="status" id="status">White to move</div>
+
+          <div class="controls">
+            <label class="field">
+              <span>Mode</span>
+              <select id="mode">
+                <option value="ai">You vs Computer</option>
+                <option value="human">Two Players</option>
+              </select>
+            </label>
+
+            <label class="field" id="sideField">
+              <span>Play as</span>
+              <select id="side">
+                <option value="w">White</option>
+                <option value="b">Black</option>
+              </select>
+            </label>
+
+            <label class="field" id="difficultyField">
+              <span>Difficulty</span>
+              <select id="difficulty">
+                <option value="1">Beginner</option>
+                <option value="4">Easy</option>
+                <option value="8" selected>Medium</option>
+                <option value="14">Hard</option>
+                <option value="20">Maximum</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="engine-card" id="engineCard">
+            <span class="engine-dot" id="engineDot"></span>
+            <div class="engine-info">
+              <div class="engine-name" id="engineName">Loading engine&hellip;</div>
+              <div class="engine-sub" id="engineSub">&nbsp;</div>
+            </div>
+          </div>
+
+          <div class="buttons">
+            <button id="newGame" class="btn btn-primary">New Game</button>
+            <button id="undo" class="btn">Undo</button>
+            <button id="flip" class="btn">Flip Board</button>
+            <button id="sound" class="btn" aria-pressed="true">Sound: On</button>
+          </div>
+
+          <div class="history-wrap">
+            <h2>Moves</h2>
+            <ol class="history" id="history"></ol>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="engine.js"></script>
+    <script src="ai.js"></script>
+    <script src="sf.js"></script>
+    <script src="sounds.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
