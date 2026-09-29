@@ -7,7 +7,7 @@
   // Where the multiplayer server lives.
   // Local dev uses the FastAPI server on :8000. In production, set PROD_URL to
   // your deployed backend (e.g. Render), or pass ?server=wss://... in the URL.
-  const PROD_URL = "wss://chess-backend.onrender.com/ws"; // <-- change to your Render URL
+  const PROD_URL = "wss://chess-backend-m8zu.onrender.com/ws"; // <-- change to your Render URL
 
   function serverUrl() {
     const override = new URLSearchParams(location.search).get("server");
